@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BANK HEIST — Cyberpunk Animation</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body,#app{width:100%;height:100%;overflow:hidden;background:#050a14;font-family:'Inter','Montserrat',sans-serif}
+#three-container{position:absolute;inset:0;z-index:0}
+#matrix-canvas{position:absolute;inset:0;z-index:10;pointer-events:none;opacity:0.2}
+.grain{position:absolute;inset:0;z-index:20;pointer-events:none;opacity:0.04;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:150px;animation:grain 0.3s steps(6) infinite}
+.scanlines{position:absolute;inset:0;z-index:20;pointer-events:none;opacity:0.03;background-image:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.3) 2px,rgba(0,0,0,0.3) 4px)}
+.vignette{position:absolute;inset:0;z-index:20;pointer-events:none;background:radial-gradient(ellipse at center,transparent 50%,rgba(5,10,20,0.6) 100%)}
+.rec-indicator{position:absolute;top:20px;right:20px;z-index:40;display:none;align-items:center;gap:8px}
+.rec-indicator.active{display:flex}
+.rec-dot{width:10px;height:10px;border-radius:50%;background:#dc2626;animation:pulse 1s infinite}
+.rec-text{color:#ef4444;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:bold;letter-spacing:2px}
+.scene-counter{position:absolute;top:20px;left:20px;z-index:40;color:#4b5563;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;display:none}
+.scene-counter.active{display:block}
+.text-overlay{position:absolute;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:60px;pointer-events:none}
+.scene-text{text-align:center;padding:0 20px;animation:fadeIn 0.6s cubic-bezier(0.16,1,0.3,1) forwards}
+.scene-title{font-size:clamp(1.5rem,5vw,3.5rem);font-weight:900;color:#fff;letter-spacing:-0.02em;line-height:1.1;margin-bottom:8px;font-family:'Montserrat',sans-serif;text-shadow:0 0 30px rgba(255,106,0,0.2),0 2px 10px rgba(0,0,0,0.5);white-space:pre-line}
+.scene-sub{font-size:clamp(0.75rem,2vw,1.1rem);color:rgba(255,106,0,0.8);font-family:'JetBrains Mono',monospace;letter-spacing:0.1em;margin-top:8px}
+.big-number{position:absolute;inset:0;z-index:30;display:none;align-items:center;justify-content:center;pointer-events:none}
+.big-number.active{display:flex}
+.big-number-text{font-size:clamp(4rem,15vw,9rem);font-weight:900;font-family:'JetBrains Mono',monospace;color:#ff6a00;text-shadow:0 0 40px rgba(255,106,0,0.4),0 0 80px rgba(255,106,0,0.2)}
+.big-number-line{position:absolute;width:100%;height:2px;background:rgba(0,0,0,0.5)}
+.overlay-panel{position:absolute;inset:0;z-index:30;display:none;align-items:center;justify-content:center;pointer-events:none}
+.overlay-panel.active{display:flex;animation:fadeIn 0.6s cubic-bezier(0.16,1,0.3,1) forwards}
+.email-panel{background:rgba(10,22,40,0.95);border:1px solid #1a3a5c;border-radius:8px;padding:20px;max-width:350px;width:90%;box-shadow:0 25px 50px rgba(0,0,0,0.5);backdrop-filter:blur(4px)}
+.email-header{display:flex;align-items:center;gap:6px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #1a3a5c}
+.email-dot{width:8px;height:8px;border-radius:50%}
+.email-label{color:#6b7280;font-size:10px;font-family:'JetBrains Mono',monospace;margin-left:8px}
+.email-row{display:flex;gap:8px;margin-bottom:6px}
+.email-key{color:#6b7280;font-size:11px;font-family:'JetBrains Mono',monospace;width:50px}
+.email-val{color:#fff;font-size:11px;font-family:'JetBrains Mono',monospace}
+.email-attach{color:#ff6a00;font-size:11px;font-family:'JetBrains Mono',monospace;text-decoration:underline}
+.email-btn{background:#ff6a00;color:#fff;padding:6px 16px;border-radius:4px;font-size:11px;font-weight:bold;font-family:'JetBrains Mono',monospace;margin-top:12px;box-shadow:0 4px 12px rgba(255,106,0,0.2)}
+.login-panel{background:rgba(10,22,40,0.95);border:1px solid #1a3a5c;border-radius:8px;padding:24px;max-width:280px;width:90%;box-shadow:0 25px 50px rgba(0,0,0,0.5)}
+.login-title{text-align:center;margin-bottom:20px}
+.login-title-main{color:#ff6a00;font-weight:bold;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:3px}
+.login-title-sub{color:#6b7280;font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:4px}
+.login-field{margin-bottom:12px}
+.login-field-label{color:#6b7280;font-size:9px;font-family:'JetBrains Mono',monospace;display:block;margin-bottom:4px}
+.login-field-value{background:#050a14;border:1px solid #1a3a5c;border-radius:4px;padding:6px 12px;color:#fff;font-size:12px;font-family:'JetBrains Mono',monospace}
+.login-access{background:rgba(22,101,52,0.3);border:1px solid rgba(22,168,74,0.5);border-radius:4px;padding:8px 12px;text-align:center;margin-top:16px}
+.login-access-text{color:#4ade80;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:bold}
+.checklist-panel{background:rgba(10,22,40,0.95);border:1px solid #1a3a5c;border-radius:8px;padding:20px;max-width:320px;width:90%}
+.checklist-title{text-align:center;color:#ff6a00;font-weight:bold;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;margin-bottom:12px}
+.checklist-item{display:flex;align-items:center;gap:12px;padding:6px 0;border-bottom:1px solid #0d1f3c}
+.checklist-check{color:#4ade80;font-size:14px}
+.checklist-text{color:#d1d5db;font-size:10px;font-family:'JetBrains Mono',monospace}
+.checklist-stamp{text-align:center;margin-top:12px}
+.checklist-stamp-text{display:inline-block;padding:4px 12px;border:2px solid #ff6a00;color:#ff6a00;font-weight:bold;font-family:'JetBrains Mono',monospace;font-size:10px;transform:rotate(-2deg);opacity:0.8}
+.payment-panel{background:rgba(10,22,40,0.95);border:1px solid #1a3a5c;border-radius:8px;padding:20px;max-width:380px;width:90%}
+.payment-title{text-align:center;color:#ff6a00;font-weight:bold;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;margin-bottom:12px}
+.payment-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #0d1f3c}
+.payment-key{color:#6b7280;font-size:10px;font-family:'JetBrains Mono',monospace}
+.payment-val{color:#fff;font-size:10px;font-family:'JetBrains Mono',monospace}
+.payment-signs{display:flex;gap:8px;margin-top:12px}
+.payment-sign{padding:2px 8px;border:1px solid #16a34a;color:#4ade80;font-size:9px;font-family:'JetBrains Mono',monospace;border-radius:4px}
+.timeline-container{width:80%;max-width:600px}
+.timeline-bar{position:relative;height:4px;background:#1a3a5c;border-radius:2px}
+.timeline-fill{position:absolute;left:0;top:0;height:100%;width:100%;background:linear-gradient(90deg,#ea580c,#fb923c);border-radius:2px}
+.timeline-point{position:absolute;top:-4px}
+.timeline-dot{width:12px;height:12px;border-radius:50%;background:#ff6a00;border:2px solid #fdba74}
+.timeline-label{font-size:9px;color:#9ca3af;font-family:'JetBrains Mono',monospace;margin-top:8px;text-align:center}
+.buttons-container{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;padding:0 16px}
+.abs-btn{position:relative;padding:10px 16px;border-radius:8px;font-size:11px;font-weight:bold;font-family:'JetBrains Mono',monospace;border:2px solid}
+.abs-btn.active{border-color:#ff6a00;color:#ff6a00;background:rgba(255,106,0,0.1);box-shadow:0 4px 12px rgba(255,106,0,0.1)}
+.abs-btn.inactive{border-color:#374151;color:#6b7280;background:rgba(55,65,81,0.1)}
+.abs-btn-num{position:absolute;top:-8px;left:-8px;width:20px;height:20px;border-radius:50%;background:#ea580c;color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:bold}
+.atm-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:12px}
+.atm-cell{width:48px;height:48px;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:8px;font-family:'JetBrains Mono',monospace;border:1px solid}
+.atm-cell.active{border-color:#ff6a00;background:rgba(255,106,0,0.15);color:#ff6a00}
+.atm-cell.inactive{border-color:rgba(26,58,92,0.5);color:#4b5563;background:rgba(10,22,40,0.5)}
+.atm-check{color:#4ade80;font-size:12px}
+.security-content{text-align:center}
+.security-eye{font-size:48px;margin-bottom:12px;animation:pulse 2s infinite}
+.security-q{font-size:18px;color:#fff;font-weight:bold;font-family:'JetBrains Mono',monospace;margin-bottom:4px}
+.security-a{font-size:12px;color:#ff6a00;font-family:'JetBrains Mono',monospace;margin-bottom:16px}
+.security-id{display:inline-block;background:rgba(10,22,40,0.9);border:1px solid rgba(255,106,0,0.5);border-radius:8px;padding:8px 16px}
+.security-id-text{color:#ff6a00;font-family:'JetBrains Mono',monospace;font-size:10px}
+.security-id-access{color:#4ade80;font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:2px}
+.control-content{display:flex;flex-direction:column;align-items:center;justify-content:center}
+.control-cities{display:flex;gap:12px;margin-bottom:24px}
+.control-city{background:rgba(10,22,40,0.9);border:1px solid #1a3a5c;border-radius:8px;padding:12px;text-align:center;min-width:80px;backdrop-filter:blur(4px)}
+.control-city-name{color:#ff6a00;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:bold}
+.control-city-atm{color:#6b7280;font-size:9px;font-family:'JetBrains Mono',monospace;margin-top:4px}
+.control-enter{background:#ea580c;color:#fff;padding:12px 40px;border-radius:8px;font-weight:900;font-size:18px;font-family:'JetBrains Mono',monospace;animation:pulse 1.5s infinite;box-shadow:0 10px 30px rgba(234,88,12,0.3)}
+.progress-bar{position:absolute;bottom:0;left:0;right:0;z-index:40;height:2px;background:#0a1628;display:none}
+.progress-bar.active{display:block}
+.progress-fill{height:100%;background:linear-gradient(90deg,#ea580c,#fb923c);transition:width 0.5s ease-out}
+.start-screen{position:absolute;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:#050a14}
+.start-screen.hidden{display:none}
+.start-content{text-align:center;padding:0 16px}
+.start-logo{display:inline-block;width:64px;height:64px;border:2px solid #ff6a00;border-radius:8px;position:relative;margin-bottom:16px;display:flex;align-items:center;justify-content:center}
+.start-logo-text{color:#ff6a00;font-size:24px;font-weight:bold;font-family:'JetBrains Mono',monospace}
+.start-logo-dot{position:absolute;top:-4px;right:-4px;width:12px;height:12px;background:#ff6a00;border-radius:50%;animation:pulse 1.5s infinite}
+.start-title{font-size:clamp(2.5rem,8vw,5rem);font-weight:900;color:#fff;margin-bottom:12px;font-family:'Montserrat',sans-serif;text-shadow:0 0 60px rgba(255,106,0,0.2),0 0 120px rgba(255,106,0,0.1)}
+.start-subtitle{color:rgba(255,106,0,0.6);font-family:'JetBrains Mono',monospace;font-size:clamp(0.65rem,1.5vw,0.875rem);letter-spacing:0.3em;margin-bottom:32px}
+.start-btn{position:relative;padding:16px 40px;background:#ea580c;color:#fff;font-weight:900;font-size:18px;border-radius:12px;border:none;cursor:pointer;font-family:'Montserrat',sans-serif;transition:all 0.3s;box-shadow:0 15px 40px rgba(234,88,12,0.2)}
+.start-btn:hover{background:#f97316;transform:scale(1.05);box-shadow:0 20px 50px rgba(249,115,22,0.4)}
+.start-btn:active{transform:scale(0.95)}
+.start-btn-content{display:flex;align-items:center;gap:8px}
+.start-info{margin-top:24px}
+.start-info-text{color:#4b5563;font-size:10px;font-family:'JetBrains Mono',monospace}
+@keyframes grain{0%,100%{transform:translate(0,0)}10%{transform:translate(-5%,-10%)}20%{transform:translate(-15%,5%)}30%{transform:translate(7%,-25%)}40%{transform:translate(-5%,25%)}50%{transform:translate(-15%,10%)}60%{transform:translate(15%,0%)}70%{transform:translate(0%,15%)}80%{transform:translate(3%,35%)}90%{transform:translate(-10%,10%)}}
+@keyframes fadeIn{0%{opacity:0;transform:translateY(15px) scale(0.98)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="three-container"></div>
+  <canvas id="matrix-canvas"></canvas>
+  <div class="grain"></div>
+  <div class="scanlines"></div>
+  <div class="vignette"></div>
+  
+  <div class="rec-indicator" id="rec">
+    <div class="rec-dot"></div>
+    <span class="rec-text">REC</span>
+  </div>
+  
+  <div class="scene-counter" id="sceneCounter">SCENE 1/30</div>
+  
+  <div class="text-overlay" id="textOverlay">
+    <div class="scene-text" id="sceneText"></div>
+  </div>
+  
+  <div class="big-number" id="bigNumber">
+    <div class="big-number-text" id="bigNumberText"></div>
+    <div class="big-number-line"></div>
+  </div>
+  
+  <div class="overlay-panel" id="overlayEmail">
+    <div class="email-panel">
+      <div class="email-header">
+        <div class="email-dot" style="background:#ef4444"></div>
+        <div class="email-dot" style="background:#eab308"></div>
+        <div class="email-dot" style="background:#22c55e"></div>
+        <span class="email-label">НОВОЕ ПИСЬМО</span>
+      </div>
+      <div class="email-row"><span class="email-key">КОМУ:</span><span class="email-val">k.ivanov@bank.ru</span></div>
+      <div class="email-row"><span class="email-key">ТЕМА:</span><span class="email-val">Отчёт Q3 — срочно</span></div>
+      <div class="email-row"><span class="email-key">📎</span><span class="email-attach">Отчёт_Q3.doc (2.4 MB)</span></div>
+      <div style="display:flex;justify-content:flex-end"><div class="email-btn">ОТПРАВИТЬ</div></div>
+    </div>
+  </div>
+  
+  <div class="overlay-panel" id="overlayTimeline">
+    <div class="timeline-container">
+      <div class="timeline-bar">
+        <div class="timeline-fill"></div>
+        <div class="timeline-point" style="left:0%"><div class="timeline-dot"></div><div class="timeline-label">09:00</div></div>
+        <div class="timeline-point" style="left:20%"><div class="timeline-dot"></div><div class="timeline-label">11:00</div></div>
+        <div class="timeline-point" style="left:40%"><div class="timeline-dot"></div><div class="timeline-label">13:00</div></div>
+        <div class="timeline-point" style="left:60%"><div class="timeline-dot"></div><div class="timeline-label">15:00</div></div>
+        <div class="timeline-point" style="left:80%"><div class="timeline-dot"></div><div class="timeline-label">16:00</div></div>
+        <div class="timeline-point" style="left:100%"><div class="timeline-dot"></div><div class="timeline-label">18:00</div></div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="overlay-panel" id="overlayButtons">
+    <div class="buttons-container">
+      <div class="abs-btn active"><span class="abs-btn-num">1</span>ПРИНЯТЬ</div>
+      <div class="abs-btn active"><span class="abs-btn-num">2</span>ПРОВЕРИТЬ</div>
+      <div class="abs-btn active"><span class="abs-btn-num">3</span>ПОДПИСЬ</div>
+      <div class="abs-btn active"><span class="abs-btn-num">4</span>ПРОВЕСТИ</div>
+      <div class="abs-btn active"><span class="abs-btn-num">5</span>ПЕЧАТЬ</div>
+      <div class="abs-btn inactive">ЗАКРЫТЬ</div>
+    </div>
+  </div>
+  
+  <div class="overlay-panel" id="overlayPayment">
+    <div class="payment-panel">
+      <div class="payment-title">ПЛАТЁЖНОЕ ПОРУЧЕНИЕ №0412</div>
+      <div class="payment-row"><span class="payment-key">ПЛАТЕЛЬЩИК</span><span class="payment-val">ООО "РОМШКА"</span></div>
+      <div class="payment-row"><span class="payment-key">ПОЛУЧАТЕЛЬ</span><span class="payment-val">••••••••••••</span></div>
+      <div class="payment-row"><span class="payment-key">СУММА</span><span class="payment-val">•••••••• ₽</span></div>
+      <div class="payment-row"><span class="payment-key">НАЗНАЧЕНИЕ</span><span class="payment-val">Оплата по договору №77</span></div>
+      <div class="payment-signs">
+        <span class="payment-sign">ПОДПИСЬ 1/2 ✓</span>
+        <span class="payment-sign">ПОДПИСЬ 2/2 ✓</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="overlay-panel" id="overlayChecklist">
+    <div class="checklist-panel">
+      <div class="checklist-title">ВНУТРЕННИЙ РЕГЛАМЕНТ</div>
+      <div class="checklist-item"><span class="checklist-check">✓</span><span class="checklist-text">ДВОЙНОЙ КОНТРОЛЬ</span></div>
+      <div class="checklist-item"><span class="checklist-check">✓</span><span class="checklist-text">ЛИМИТЫ ПО ВРЕМЕНИ</span></div>
+      <div class="checklist-item"><span class="checklist-check">✓</span><span class="checklist-text">ЖУРНАЛ ДЕЙСТВИЙ</span></div>
+      <div class="checklist-item"><span class="checklist-check">✓</span><span class="checklist-text">СВЕРКА В 16:00</span></div>
+      <div class="checklist-item"><span class="checklist-check">✓</span><span class="checklist-text">ИНКАССАЦИЯ ATM</span></div>
+      <div class="checklist-item"><span class="checklist-check">✓</span><span class="checklist-text">ДОСТУП АДМИНОВ</span></div>
+      <div class="checklist-stamp"><span class="checklist-stamp-text">ИЗУЧЕНО</span></div>
+    </div>
+  </div>
+  
+  <div class="overlay-panel" id="overlayLogin">
+    <div class="login-panel">
+      <div class="login-title">
+        <div class="login-title-main">CORP-NET</div>
+        <div class="login-title-sub">ВХОД В СИСТЕМУ</div>
+      </div>
+      <div class="login-field">
+        <label class="login-field-label">ЛОГИН</label>
+        <div class="login-field-value">admin_ops</div>
+      </div>
+      <div class="login-field">
+        <label class="login-field-label">ПАРОЛЬ</label>
+        <div class="login-field-value">••••••••</div>
+      </div>
+      <div class="login-access">
+        <span class="login-access-text">✓ ДОСТУП РАЗРЕШЁН</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="overlay-panel" id="overlaySecurity">
+    <div class="security-content">
+      <div class="security-eye">👁️</div>
+      <div class="security-q">ХАКЕР?</div>
+      <div class="security-a">А ЛЕГИТИМНОГО АДМИНИСТРАТОРА</div>
+      <div class="security-id">
+        <div class="security-id-text">ID: ADM-0420</div>
+        <div class="security-id-access">ДОСТУП: ПОЛНЫЙ</div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="overlay-panel" id="overlayAtmGrid">
+    <div class="atm-grid" id="atmGrid"></div>
+  </div>
+  
+  <div class="overlay-panel" id="overlayControl">
+    <div class="control-content">
+      <div class="control-cities">
+        <div class="control-city"><div class="control-city-name">МОСКВА</div><div class="control-city-atm">🏧 ×4</div></div>
+        <div class="control-city"><div class="control-city-name">ПРАГА</div><div class="control-city-atm">🏧 ×3</div></div>
+        <div class="control-city"><div class="control-city-name">НЬЮ-ЙОРК</div><div class="control-city-atm">🏧 ×3</div></div>
+      </div>
+      <div class="control-enter">▶ ENTER</div>
+    </div>
+  </div>
+  
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+  
+  <div class="start-screen" id="startScreen">
+    <div class="start-content">
+      <div class="start-logo">
+        <span class="start-logo-text">BH</span>
+        <div class="start-logo-dot"></div>
+      </div>
+      <h1 class="start-title">BANK HEIST</h1>
+      <p class="start-subtitle">CYBERPUNK ANIMATION</p>
+      <button class="start-btn" id="playBtn">
+        <span class="start-btn-content"><span style="font-size:20px">▶</span> PLAY</span>
+      </button>
+      <div class="start-info">
+        <p class="start-info-text">30 СЦЕН · THREE.JS · GSAP</p>
+        <p class="start-info-text" style="margin-top:4px">~90 СЕКУНД АНИМАЦИИ</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ SCENE DATA ============
+const SCENES = [
+  {id:1,text:'ТРИ ЧАСА НОЧИ',sub:'TRANSFER // 100 NODES 97%',dur:4},
+  {id:2,text:'В ПОЛУМРАКЕ НОЧИ',sub:'',dur:3,bigNum:'02:59'},
+  {id:3,text:'МЕДЛЕННО ПОЛЗЁТ ПОЛОСА ЗАГРУЗКИ',sub:'10% → 97%',dur:3},
+  {id:4,text:'В ЭТОТ САМЫЙ МОМЕНТ ТЫ',sub:'УПРАВЛЯЕШЬ СОТНЕЙ БАНКОВ',dur:4},
+  {id:5,text:'ВСЁ НАЧАЛОСЬ',sub:'ОКТЯБРЬ 2024 · -1 ГОД',dur:3},
+  {id:6,text:'НИКАКИХ МАСОК',sub:'',dur:3},
+  {id:7,text:'ТВОЁ ГЛАВНОЕ ОРУЖИЕ',sub:'КОМУ: k.ivanov@bank.ru',dur:4,overlay:'email'},
+  {id:8,text:'ОБЫЧНОЕ ФИШИНГОВОЕ ПИСЬМО',sub:'📎 Отчёт_Q3.doc',dur:3},
+  {id:9,text:'ОТПРАВЛЕННОЕ РЯДОВОМУ КЛЕРКУ',sub:'',dur:3},
+  {id:10,text:'ОН КЛИКНУЛ',sub:'',dur:2},
+  {id:11,text:'ВИРУС ПРОНИК',sub:'В СЕТЬ',dur:3},
+  {id:12,text:'ТЫ СТАЛ',sub:'ПРИЗРАКОМ СИСТЕМЫ',dur:3},
+  {id:13,text:'МЕСЯЦАМИ СЕБЯ НЕ ПРОЯВЛЯЛ',sub:'',dur:4},
+  {id:14,text:'ДЕНЬГИ',sub:'$100 × ∞',dur:3},
+  {id:15,text:'ТЫ ПРОСТО СИДЕЛ\nСМОТРЕЛ И СЛУШАЛ',sub:'ОПЕРЗАЛ #3 · REC',dur:4,rec:true},
+  {id:16,text:'ПРОГРАММЫ КАЖДЫЙ ДЕНЬ',sub:'ЗАПИСЬ ЭКРАНОВ ОПЕРАЦИОНИСТОВ',dur:3,rec:true},
+  {id:17,text:'СОХРАНЕНО: 2338 ЧАСОВ',sub:'ЗАПИСЬ #0412 · ОПЕРАЦИОНИСТ 2',dur:3,rec:true},
+  {id:18,text:'ТЫ ИЗУЧИЛ ИХ РАСПОРЯДОК',sub:'09:00 → 18:00',dur:3,overlay:'timeline'},
+  {id:19,text:'УЗНАЛ КАКИЕ КНОПКИ ОНИ НАЖИМАЮТ',sub:'ПРИНЯТЬ → ПРОВЕРИТЬ → ПОДПИСЬ → ПРОВЕСТИ → ПЕЧАТЬ',dur:4,overlay:'buttons'},
+  {id:20,text:'КАК ПРОХОДЯТ ПЕРЕВОДЫ',sub:'ПЛАТЕЛЬЩИК → ПОЛУЧАТЕЛЬ → СУММА',dur:3,overlay:'payment'},
+  {id:21,text:'И ВНУТРЕННИЕ РЕГЛАМЕНТЫ',sub:'✓ ДВОЙНОЙ КОНТРОЛЬ · ✓ ЛИМИТЫ · ✓ ЖУРНАЛ',dur:4,overlay:'checklist'},
+  {id:22,text:'ТЫ УЗНАЛ БАНКОВСКИЕ МЕХАНИЗМЫ\nЛУЧШЕ, ЧЕМ ТЕ, КТО ИХ СОЗДАВАЛ',sub:'ЯДРО → РЕЕСТР → ЛЕДЖЕР · ИЗУЧЕНО 100%',dur:4},
+  {id:23,text:'',sub:'',dur:2,bigNum:'03:45'},
+  {id:24,text:'ТЫ ЗАХОДИШЬ ВО ВНУТРЕННЮЮ СЕТЬ',sub:'CORP-NET · admin_ops',dur:3,overlay:'login'},
+  {id:25,text:'СИСТЕМА ВИДИТ В ТЕБЕ НЕ ХАКЕРА',sub:'ADM-0420 · ДОСТУП: ПОЛНЫЙ',dur:4,overlay:'security'},
+  {id:26,text:'2417 БАНКОМАТОВ В СЕТИ',sub:'',dur:3},
+  {id:27,text:'ТЫ ВЫБИРАЕШЬ ДЕСЯТКУ',sub:'ВЫБРАНО: 09/10 · ATM-100...ATM-261',dur:3,overlay:'atmgrid'},
+  {id:28,text:'В МОСКВЕ, ПРАГЕ, НЬЮ-ЙОРКЕ',sub:'',dur:3},
+  {id:29,text:'НАЖИМАЕШЬ ENTER',sub:'ВЫДАТЬ ВСЮ НАЛИЧНОСТЬ',dur:4,overlay:'control'},
+  {id:30,text:'NATRIA VPN',sub:'СВОБОДА В СЕТИ',dur:5}
+];
+
+// ============ COLORS ============
+const C = {
+  bg:0x0a1628,bgDark:0x050a14,orange:0xff6a00,orangeL:0xff8c00,
+  green:0x00ff41,red:0xff0033,white:0xffffff,darkBlue:0x0d1f3c,
+  midBlue:0x1a3a5c,panel:0x0a0a0a,screen:0x001a0a,desk:0x1a2a3a,
+  floor:0x0d1520,skin:0x8B6914,shirt:0x2244aa,hoodie:0x1a1a1a,money:0x2a6a2a
+};
+
+// ============ THREE.JS ENGINE ============
+let scene, camera, renderer, objs=[], clock, animId;
+const container = document.getElementById('three-container');
+
+function initThree(){
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(C.bg);
+  scene.fog = new THREE.FogExp2(C.bg, 0.02);
+  camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 500);
+  camera.position.set(8,6,8);
+  camera.lookAt(0,1,0);
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.shadowMap.enabled = true;
+  container.appendChild(renderer.domElement);
+  clock = new THREE.Clock();
+  
+  // Lights
+  scene.add(new THREE.AmbientLight(0x334466, 0.7));
+  const d = new THREE.DirectionalLight(0xffffff, 0.6);
+  d.position.set(5,10,7); d.castShadow=true; scene.add(d);
+  const p = new THREE.PointLight(C.orange, 0.4, 25);
+  p.position.set(-3,5,-3); scene.add(p);
+  
+  animate();
+}
+
+function animate(){
+  animId = requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  objs.forEach(o=>{
+    if(o.userData.type==='rotate') o.rotation.y = t*0.3;
+    if(o.userData.type==='float') o.position.y += Math.sin(t*2)*0.001;
+    if(o.userData.type==='pulse'){const s=1+Math.sin(t*3)*0.1;o.scale.set(s,s,s);}
+    if(o.userData.type==='signal'){o.rotation.z+=0.005;o.rotation.x+=0.003;}
+  });
+  renderer.render(scene, camera);
+}
+
+function clearScene(){
+  objs.forEach(o=>{
+    scene.remove(o);
+    if(o.geometry) o.geometry.dispose();
+    if(o.material){
+      if(Array.isArray(o.material)) o.material.forEach(m=>m.dispose());
+      else o.material.dispose();
+    }
+  });
+  objs=[];
+}
+
+function box(x,y,z,w,h,d,col,opts={}){
+  const g=new THREE.BoxGeometry(w,h,d);
+  const m=new THREE.MeshLambertMaterial({color:col,flatShading:true,emissive:opts.emissive||0,wireframe:opts.wireframe||false,transparent:opts.transparent||false,opacity:opts.opacity||1});
+  const mesh=new THREE.Mesh(g,m);
+  mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;
+  scene.add(mesh);objs.push(mesh);return mesh;
+}
+
+function cyl(x,y,z,r,h,col,seg=8){
+  const g=new THREE.CylinderGeometry(r,r,h,seg);
+  const m=new THREE.MeshLambertMaterial({color:col,flatShading:true});
+  const mesh=new THREE.Mesh(g,m);mesh.position.set(x,y,z);
+  scene.add(mesh);objs.push(mesh);return mesh;
+}
+
+function sphere(x,y,z,r,col,opts={}){
+  const g=new THREE.SphereGeometry(r,opts.segments||12,opts.segments||8);
+  const m=new THREE.MeshBasicMaterial({color:col,wireframe:opts.wireframe||false,transparent:opts.transparent||false,opacity:opts.opacity||1});
+  const mesh=new THREE.Mesh(g,m);mesh.position.set(x,y,z);
+  scene.add(mesh);objs.push(mesh);return mesh;
+}
+
+function points(pos,col,size=0.05){
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const m=new THREE.PointsMaterial({color:col,size});
+  const p=new THREE.Points(g,m);scene.add(p);objs.push(p);return p;
+}
+
+function line(p1,p2,col,op=0.3){
+  const g=new THREE.BufferGeometry().setFromPoints([p1,p2]);
+  const m=new THREE.LineBasicMaterial({color:col,transparent:true,opacity:op});
+  const l=new THREE.Line(g,m);scene.add(l);objs.push(l);return l;
+}
+
+function ring(x,y,z,r1,r2,col){
+  const g=new THREE.RingGeometry(r1,r2,24);
+  const m=new THREE.MeshBasicMaterial({color:col,side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(g,m);mesh.position.set(x,y,z);
+  scene.add(mesh);objs.push(mesh);return mesh;
+}
+
+// ============ SCENE BUILDERS ============
+const builders = {
+  1:()=>{
+    camera.position.set(10,5,10);camera.lookAt(0,1.5,0);
+    box(0,-0.1,0,14,0.2,12,C.bgDark);
+    box(0,1,-2,7,0.15,2.5,C.desk);
+    box(-3,0,-2,0.2,2,0.2,C.floor);box(3,0,-2,0.2,2,0.2,C.floor);
+    for(let i=-1;i<=1;i++){
+      box(i*2.2,2.3,-2.8,1.8,1.3,0.08,C.panel);
+      const s=box(i*2.2,2.3,-2.75,1.6,1.1,0.02,C.screen,{emissive:0x001a0a});
+      s.userData.type='pulse';
+      box(i*2.2,1.3,-2.5,0.15,0.6,0.15,0x333333);
+    }
+    box(0,1.9,-2.73,1.3,0.08,0.01,0x003300);
+    box(0,1.9,-2.72,1.1,0.06,0.01,C.green,{emissive:C.green});
+    box(0,1.1,-1.2,2,0.08,0.6,0x222222);
+    box(0,2,0.5,0.9,1.4,0.6,C.hoodie);
+    box(0,3.1,0.5,0.55,0.55,0.55,C.hoodie);
+    box(0,3.35,0.78,0.45,0.15,0.05,0x333333);
+    box(4.5,2.5,-1,1.5,2.2,0.08,C.panel);
+    box(4.5,2.5,-0.95,1.3,2.0,0.02,0x001a0a,{emissive:0x002a0a});
+    cyl(2.5,1.2,-1,0.12,0.25,0x666666,8);
+  },
+  2:()=>{
+    camera.position.set(0,2,6);camera.lookAt(0,2,0);
+    box(0,-0.1,0,10,0.2,6,C.bgDark);
+    for(let i=0;i<4;i++){
+      const x=-1.8+i*1.2;
+      box(x,2,0,1,1.6,0.3,0x1a1a1a);
+      box(x,2,0.16,0.9,1.5,0.02,C.orange,{emissive:C.orange});
+      box(x,2,0.17,0.9,0.02,0.01,0x000000);
+    }
+    sphere(0,2.3,0.2,0.08,C.orange,{segments:6});
+    sphere(0,1.7,0.2,0.08,C.orange,{segments:6});
+  },
+  3:()=>{
+    camera.position.set(0,2,5);camera.lookAt(0,2,0);
+    box(0,-0.1,0,8,0.2,4,C.bgDark);
+    box(0,2.5,0,6,3.5,0.2,C.panel);
+    box(0,2.5,0.11,5.6,3.1,0.02,0x001a0a,{emissive:0x000a00});
+    box(0,2,0.13,4.5,0.3,0.01,0x002200);
+    const b=box(-0.5,2,0.14,3,0.25,0.01,C.green,{emissive:C.green});
+    b.userData.type='pulse';
+    box(0,0.5,0,0.3,1,0.3,0x333333);
+    box(0,0,0,1.5,0.1,0.8,0x333333);
+  },
+  4:()=>{
+    camera.position.set(0,0,9);camera.lookAt(0,0,0);
+    const g=sphere(0,0,0,3,C.midBlue,{wireframe:true,segments:24});g.userData.type='rotate';
+    const pos=new Float32Array(500*3);
+    for(let i=0;i<500;i++){const phi=Math.random()*Math.PI,theta=Math.random()*Math.PI*2;pos[i*3]=3.02*Math.sin(phi)*Math.cos(theta);pos[i*3+1]=3.02*Math.cos(phi);pos[i*3+2]=3.02*Math.sin(phi)*Math.sin(theta);}
+    const p=points(pos,0x1a3a5c,0.03);p.userData.type='rotate';
+    for(let i=0;i<30;i++){const phi=Math.random()*Math.PI,theta=Math.random()*Math.PI*2;const d=sphere(3.1*Math.sin(phi)*Math.cos(theta),3.1*Math.cos(phi),3.1*Math.sin(phi)*Math.sin(theta),0.07,C.orange);d.userData.type='pulse';}
+  },
+  5:()=>{
+    camera.position.set(0,3,6);camera.lookAt(0,1.5,0);
+    box(0,1.5,0,4,3.5,0.15,0x1a2a3a);
+    box(0,3,0.08,4,0.7,0.05,C.orange,{emissive:C.orange});
+    for(let i=0;i<7;i++) box(-1.5+i*0.5,1.5,0.08,0.01,2.2,0.01,0x2a4a6a);
+    for(let i=0;i<5;i++) box(0,0.6+i*0.5,0.08,3.6,0.01,0.01,0x2a4a6a);
+    const s=box(0,-0.1,0.2,4,0.6,0.08,0x2a3a4a);s.userData.type='float';
+    cyl(-1.2,3.3,0.1,0.08,0.3,0x666666);cyl(1.2,3.3,0.1,0.08,0.3,0x666666);
+  },
+  6:()=>{
+    camera.position.set(0,2,5);camera.lookAt(0,2,0);
+    const g=new THREE.SphereGeometry(1.5,6,5,0,Math.PI*2,0,Math.PI*0.55);
+    const m=new THREE.MeshLambertMaterial({color:0x0a0a0a,flatShading:true});
+    const mask=new THREE.Mesh(g,m);mask.position.set(0,2,0);mask.userData.type='float';
+    scene.add(mask);objs.push(mask);
+    box(-0.4,2.3,1.15,0.35,0.12,0.08,C.orange,{emissive:C.orange});
+    box(0.4,2.3,1.15,0.35,0.12,0.08,C.orange,{emissive:C.orange});
+    box(0,1.7,1.2,0.5,0.05,0.05,0x333333);
+    const pos=new Float32Array(400*3);
+    for(let i=0;i<400;i++){pos[i*3]=(Math.random()-0.5)*10;pos[i*3+1]=Math.random()*6;pos[i*3+2]=(Math.random()-0.5)*10;}
+    const p=points(pos,C.orange,0.03);p.userData.type='rotate';
+  },
+  7:()=>{camera.position.set(0,2,5);camera.lookAt(0,2,0);box(0,-0.1,0,6,0.2,4,C.bgDark);},
+  8:()=>{
+    camera.position.set(0,10,12);camera.lookAt(0,0,0);
+    for(let x=-6;x<=6;x+=1.5)for(let z=-6;z<=6;z+=1.5){
+      const h=Math.random()*4+0.5;const col=Math.random()>0.5?C.darkBlue:C.midBlue;
+      box(x,h/2,z,0.9,h,0.9,col);
+      if(h>2)for(let wy=1;wy<h-0.5;wy+=0.8)if(Math.random()>0.5)box(x,wy,z+0.46,0.15,0.15,0.01,0xffcc00,{emissive:0x443300});
+    }
+    const e=box(0,7,0,1.5,1,0.1,0xeeeeee);e.userData.type='float';
+    sphere(0,7.4,0.06,0.1,C.red);
+    line(new THREE.Vector3(0,6.5,0),new THREE.Vector3(0,5,0),C.orange,0.5);
+  },
+  9:()=>{
+    camera.position.set(7,4,7);camera.lookAt(0,1.5,0);
+    box(0,-0.1,0,12,0.2,10,0x1a1a2a);
+    box(0,1,-1,3.5,0.12,1.8,0x2a3a4a);
+    box(-1.5,0,-1,0.15,2,0.15,C.floor);box(1.5,0,-1,0.15,2,0.15,C.floor);
+    box(0,2,0.8,0.7,1.2,0.45,C.shirt);
+    box(0,1.7,1.03,0.08,0.7,0.04,C.red);
+    box(0,3,0.8,0.45,0.45,0.45,C.skin);
+    box(0,3.25,0.8,0.47,0.15,0.47,0x3a2a1a);
+    box(0,2.2,-1.8,1.4,1,0.08,C.panel);
+    box(0,2.2,-1.75,1.2,0.85,0.02,0x001a2a,{emissive:0x000a15});
+    box(0,1.3,-1.5,0.12,0.5,0.12,0x333333);
+    box(-5,2.5,-4,0.08,3.5,3.5,0x1a2a3a);
+    for(let i=0;i<8;i++) box(-4.95,1.2+i*0.4,-4,0.02,0.04,3.2,0x3a4a5a);
+    cyl(3,0.3,-2,0.2,0.6,0x4a3a2a,6);
+    sphere(3,0.8,-2,0.35,0x2a6a2a,{segments:6});
+  },
+  10:()=>{
+    camera.position.set(0,3,4);camera.lookAt(0,1,0);
+    box(0,-0.1,0,6,0.2,4,C.bgDark);
+    const g=new THREE.CapsuleGeometry(0.3,0.5,4,8);
+    const m=new THREE.MeshLambertMaterial({color:0x111111,flatShading:true});
+    const mouse=new THREE.Mesh(g,m);mouse.position.set(0,0.4,0);mouse.rotation.x=Math.PI/2;
+    scene.add(mouse);objs.push(mouse);
+    box(0.3,1.2,-0.5,0.6,0.3,1.2,0x8B6914);
+    box(0.3,1.0,0.3,0.5,0.15,0.3,0x8B6914);
+    box(0,0.1,0,4,0.15,3,0x2a3a4a);
+  },
+  11:()=>{
+    camera.position.set(8,8,8);camera.lookAt(0,0,0);
+    for(let x=-3.6;x<=3.6;x+=1.2)for(let z=-3.6;z<=3.6;z+=1.2){
+      const isGreen=Math.random()>0.5;const isInfected=x===0&&z===0;
+      const col=isInfected?C.orange:isGreen?0x00aa33:0x0a2a1a;
+      const cube=box(x,0.3,z,0.8,0.6,0.8,col,isInfected?{emissive:C.orange}:undefined);
+      if(isInfected) cube.userData.type='pulse';
+    }
+    for(let i=0;i<15;i++) line(new THREE.Vector3((Math.random()-0.5)*7,0.6,(Math.random()-0.5)*7),new THREE.Vector3((Math.random()-0.5)*7,0.6,(Math.random()-0.5)*7),C.green,0.2);
+  },
+  12:()=>{
+    camera.position.set(0,2,6);camera.lookAt(0,2,0);
+    box(0,-0.1,0,8,0.2,6,C.bgDark);
+    const skull=[[-0.8,3.5],[-0.5,3.8],[0,3.9],[0.5,3.8],[0.8,3.5],[0.9,3],[0.8,2.5],[0.5,2.2],[-0.5,2.2],[-0.8,2.5],[-0.9,3]];
+    skull.forEach(([x,y])=>box(x,y,0,0.15,0.15,0.15,C.green,{emissive:C.green}));
+    box(-0.3,3.2,0.1,0.2,0.2,0.1,0x000000);box(0.3,3.2,0.1,0.2,0.2,0.1,0x000000);
+    box(0,2.8,0.1,0.1,0.15,0.1,0x000000);
+    for(let i=-2;i<=2;i++) box(i*0.15,2.3,0.1,0.1,0.1,0.1,C.green,{emissive:C.green});
+  },
+  13:()=>{
+    camera.position.set(7,4,9);camera.lookAt(0,2,0);
+    box(0,-0.1,0,16,0.2,12,C.bgDark);
+    box(0,0.8,-1,10,0.12,2.5,C.desk);
+    for(let row=0;row<2;row++)for(let col=0;col<3;col++){
+      const x=-2.5+col*2.5,y=2+row*1.6;
+      box(x,y,-3,2,1.3,0.08,C.panel);
+      const s=box(x,y,-2.95,1.8,1.1,0.02,C.screen,{emissive:0x001a0a});s.userData.type='pulse';
+    }
+    box(0,2,1.5,1,1.6,0.6,C.hoodie);
+    box(0,3.2,1.5,0.6,0.6,0.6,C.hoodie);
+    box(0,3.2,1.81,0.5,0.12,0.04,0x444444);
+    box(0,5,-6,12,4,0.1,0x050a14);
+    for(let i=0;i<15;i++) box(-4+Math.random()*8,4+Math.random()*3,-5.9,0.04,0.04,0.01,0xffffff);
+    sphere(3,5.5,-5.8,0.4,0xccccaa);
+  },
+  14:()=>{
+    camera.position.set(0,4,7);camera.lookAt(0,1.5,0);
+    box(0,-0.1,0,8,0.2,6,C.bgDark);
+    const g=new THREE.SphereGeometry(2.5,16,12,0,Math.PI*2,0,Math.PI*0.5);
+    const m=new THREE.MeshPhongMaterial({color:0x88aacc,transparent:true,opacity:0.12,flatShading:true,side:THREE.DoubleSide});
+    const dome=new THREE.Mesh(g,m);dome.position.set(0,0,0);scene.add(dome);objs.push(dome);
+    cyl(0,-0.1,0,2.8,0.4,0x1a2a3a,12);
+    for(let i=0;i<7;i++){const x=-1.5+i*0.5;for(let j=0;j<4;j++) box(x,0.2+j*0.12,0,0.35,0.08,0.2,C.money);}
+    box(0,1,0.13,0.6,0.25,0.01,C.orange,{emissive:C.orange});
+  },
+  15:()=>{
+    camera.position.set(0,2.5,10);camera.lookAt(0,2.5,0);
+    box(0,-0.1,0,12,0.2,6,C.bgDark);
+    for(let row=0;row<3;row++)for(let col=0;col<3;col++){
+      const x=-3+col*3,y=0.5+row*2.5;
+      box(x,y,0,2.5,2,0.15,C.panel);
+      box(x,y,0.08,2.3,1.8,0.02,0x001a2a,{emissive:0x000a15});
+      if(Math.random()>0.4){const r=box(x+1,y+0.8,0.1,0.12,0.12,0.01,C.red,{emissive:C.red});r.userData.type='pulse';}
+    }
+  },
+  16:()=>{
+    camera.position.set(7,4,7);camera.lookAt(0,1.5,0);
+    box(0,-0.1,0,12,0.2,10,0x1a1a2a);
+    for(let i=-1;i<=1;i+=2){
+      box(i*2.5,1,0,2.5,0.12,1.5,C.desk);
+      box(i*2.5,2,1,0.6,1.1,0.4,0x334455);
+      box(i*2.5,2.9,1,0.4,0.4,0.4,C.skin);
+      box(i*2.5,2,-0.8,1.2,0.9,0.08,C.panel);
+      box(i*2.5,2,-0.75,1,0.7,0.02,0x001a2a,{emissive:0x000a15});
+    }
+  },
+  17:()=>{camera.position.set(0,2,5);camera.lookAt(0,2,0);box(0,-0.1,0,6,0.2,4,C.bgDark);},
+  18:()=>{camera.position.set(0,2,5);camera.lookAt(0,2,0);box(0,-0.1,0,6,0.2,4,C.bgDark);},
+  19:()=>{camera.position.set(0,2,5);camera.lookAt(0,2,0);box(0,-0.1,0,6,0.2,4,C.bgDark);},
+  20:()=>{camera.position.set(0,2,5);camera.lookAt(0,2,0);box(0,-0.1,0,6,0.2,4,C.bgDark);},
+  21:()=>{camera.position.set(0,2,5);camera.lookAt(0,2,0);box(0,-0.1,0,6,0.2,4,C.bgDark);},
+  22:()=>{
+    camera.position.set(8,6,8);camera.lookAt(0,2,0);
+    box(0,-0.1,0,12,0.2,10,C.bgDark);
+    for(let x=-1;x<=1;x+=2)for(let z=-1;z<=1;z+=2) box(x*0.9,0.5,z*0.9,1.4,1,1.4,C.midBlue);
+    for(let x=-0.5;x<=0.5;x+=1)for(let z=-0.5;z<=0.5;z+=1) box(x*0.9,1.5,z*0.9,1.4,1,1.4,0x2a5a8a);
+    box(0,2.5,0,1.4,1,1.4,0x3a7aba);
+    box(3.5,0.5,0,1.2,1,1.2,C.darkBlue);
+    box(-3.5,0.5,0,1.2,1,1.2,C.darkBlue);
+    const r1=ring(1.8,0.5,1.8,0.6,0.8,C.orange);r1.rotation.x=-Math.PI/2;r1.userData.type='pulse';
+    const r2=ring(-1.8,0.5,-1.8,0.6,0.8,C.orange);r2.rotation.x=-Math.PI/2;r2.userData.type='pulse';
+    line(new THREE.Vector3(0,0.5,0),new THREE.Vector3(3.5,0.5,0),C.orange,0.4);
+    line(new THREE.Vector3(0,0.5,0),new THREE.Vector3(-3.5,0.5,0),C.orange,0.4);
+  },
+  23:()=>{camera.position.set(0,2,5);camera.lookAt(0,2,0);box(0,-0.1,0,6,0.2,4,C.bgDark);},
+  24:()=>{camera.position.set(0,2,5);camera.lookAt(0,2,0);box(0,-0.1,0,6,0.2,4,C.bgDark);},
+  25:()=>{
+    camera.position.set(0,2,5);camera.lookAt(0,2,0);
+    box(0,-0.1,0,6,0.2,4,C.bgDark);
+    const g=new THREE.SphereGeometry(0.8,8,6);
+    const m=new THREE.MeshLambertMaterial({color:0x1a1a1a,flatShading:true});
+    const eye=new THREE.Mesh(g,m);eye.position.set(0,3,0);scene.add(eye);objs.push(eye);
+    sphere(0,3,0.75,0.3,C.orange,{segments:8});
+    sphere(0,3,0.8,0.12,0x000000,{segments:6});
+    line(new THREE.Vector3(-2,3,0.5),new THREE.Vector3(2,3,0.5),C.orange,0.3);
+    line(new THREE.Vector3(-1.5,3.5,0.5),new THREE.Vector3(1.5,2.5,0.5),C.orange,0.2);
+  },
+  26:()=>{
+    camera.position.set(0,0,10);camera.lookAt(0,0,0);
+    const g=sphere(0,0,0,3,C.midBlue,{wireframe:true,segments:24});g.userData.type='rotate';
+    const pos=new Float32Array(200*3);
+    for(let i=0;i<200;i++){const phi=Math.random()*Math.PI,theta=Math.random()*Math.PI*2;pos[i*3]=3.05*Math.sin(phi)*Math.cos(theta);pos[i*3+1]=3.05*Math.cos(phi);pos[i*3+2]=3.05*Math.sin(phi)*Math.sin(theta);}
+    const p=points(pos,C.orange,0.05);p.userData.type='rotate';
+  },
+  27:()=>{camera.position.set(0,2,5);camera.lookAt(0,2,0);box(0,-0.1,0,6,0.2,4,C.bgDark);},
+  28:()=>{
+    camera.position.set(0,3,8);camera.lookAt(0,1,0);
+    box(0,-0.1,0,14,0.2,8,C.bgDark);
+    const cities=[{x:-4,h:[2,3.5,2.5,4,1.5,3]},{x:0,h:[1.5,2,3,2.5,1.8]},{x:4,h:[3,4.5,2,3.5,5,2.5]}];
+    cities.forEach(c=>{c.h.forEach((h,i)=>{box(c.x-1+i*0.5,h/2,0,0.4,h,0.4,C.darkBlue);if(Math.random()>0.5) sphere(c.x-1+i*0.5,h+0.2,0.21,0.08,C.orange);});});
+  },
+  29:()=>{camera.position.set(0,2,5);camera.lookAt(0,2,0);box(0,-0.1,0,6,0.2,4,C.bgDark);},
+  30:()=>{
+    camera.position.set(0,0,10);camera.lookAt(0,0,0);
+    const g=sphere(0,0,0,3,C.midBlue,{wireframe:true,segments:24});g.userData.type='rotate';
+    for(let i=0;i<6;i++){
+      const tg=new THREE.TorusGeometry(3.5+i*0.4,0.02,8,32,Math.PI);
+      const tm=new THREE.MeshBasicMaterial({color:C.orange,transparent:true,opacity:0.5-i*0.06});
+      const t=new THREE.Mesh(tg,tm);t.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,0);
+      t.userData.type='signal';scene.add(t);objs.push(t);
+    }
+    for(let i=0;i<8;i++){const phi=Math.random()*Math.PI,theta=Math.random()*Math.PI*2;const d=sphere(3.1*Math.sin(phi)*Math.cos(theta),3.1*Math.cos(phi),3.1*Math.sin(phi)*Math.sin(theta),0.1,C.orange);d.userData.type='pulse';}
+  }
+};
+
+// ============ ATM GRID ============
+function buildAtmGrid(){
+  const grid=document.getElementById('atmGrid');
+  grid.innerHTML='';
+  const active=[2,5,7,11,13,16,18,21,23];
+  for(let i=0;i<25;i++){
+    const isActive=active.includes(i);
+    const cell=document.createElement('div');
+    cell.className='atm-cell '+(isActive?'active':'inactive');
+    cell.innerHTML=isActive?'<span class="atm-check">✓</span><span style="font-size:7px">ATM-'+(100+i)+'</span>':'ATM-'+(100+i);
+    grid.appendChild(cell);
+  }
+}
+
+// ============ MATRIX RAIN ============
+let matrixAnim=0;
+function startMatrix(){
+  const cv=document.getElementById('matrix-canvas');
+  const ctx=cv.getContext('2d');
+  cv.width=innerWidth;cv.height=innerHeight;
+  const cols=Math.floor(cv.width/14);
+  const drops=Array(cols).fill(1);
+  const chars='アイウエオカキクケコサシスセソ0123456789ABCDEF{}[]<>/\\|';
+  function draw(){
+    ctx.fillStyle='rgba(5,10,20,0.04)';
+    ctx.fillRect(0,0,cv.width,cv.height);
+    ctx.fillStyle='#00ff4122';
+    ctx.font='11px monospace';
+    for(let i=0;i<drops.length;i++){
+      const ch=chars[Math.floor(Math.random()*chars.length)];
+      ctx.fillText(ch,i*14,drops[i]*14);
+      if(drops[i]*14>cv.height&&Math.random()>0.98) drops[i]=0;
+      drops[i]++;
+    }
+    matrixAnim=requestAnimationFrame(draw);
+  }
+  draw();
+}
+function stopMatrix(){cancelAnimationFrame(matrixAnim);}
+
+// ============ OVERLAY MANAGEMENT ============
+const overlays=['overlayEmail','overlayTimeline','overlayButtons','overlayPayment','overlayChecklist','overlayLogin','overlaySecurity','overlayAtmGrid','overlayControl'];
+function hideAllOverlays(){
+  overlays.forEach(id=>{document.getElementById(id).classList.remove('active');});
+  document.getElementById('bigNumber').classList.remove('active');
+  document.getElementById('rec').classList.remove('active');
+}
+
+function updateUI(idx){
+  const s=SCENES[idx];
+  hideAllOverlays();
+  
+  // Text
+  const textEl=document.getElementById('sceneText');
+  if(s.text||s.sub){
+    textEl.innerHTML=(s.text?'<h1 class="scene-title">'+s.text+'</h1>':'')+(s.sub?'<p class="scene-sub">'+s.sub+'</p>':'');
+    textEl.style.animation='none';textEl.offsetHeight;textEl.style.animation='';
+  } else {
+    textEl.innerHTML='';
+  }
+  
+  // Big number
+  if(s.bigNum){
+    document.getElementById('bigNumber').classList.add('active');
+    document.getElementById('bigNumberText').textContent=s.bigNum;
+  }
+  
+  // REC
+  if(s.rec) document.getElementById('rec').classList.add('active');
+  
+  // Overlay
+  if(s.overlay){
+    const map={email:'overlayEmail',timeline:'overlayTimeline',buttons:'overlayButtons',payment:'overlayPayment',checklist:'overlayChecklist',login:'overlayLogin',security:'overlaySecurity',atmgrid:'overlayAtmGrid',control:'overlayControl'};
+    if(map[s.overlay]){
+      if(s.overlay==='atmgrid') buildAtmGrid();
+      document.getElementById(map[s.overlay]).classList.add('active');
+    }
+  }
+  
+  // Counter & progress
+  document.getElementById('sceneCounter').textContent='SCENE '+(idx+1)+'/'+SCENES.length;
+  document.getElementById('progressFill').style.width=((idx+1)/SCENES.length*100)+'%';
+}
+
+// ============ TIMELINE ============
+let timeline=null;
+function startTimeline(){
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('sceneCounter').classList.add('active');
+  document.getElementById('progressBar').classList.add('active');
+  
+  startMatrix();
+  
+  timeline=gsap.timeline({
+    onUpdate:function(){
+      const p=timeline.progress();
+      const idx=Math.min(Math.floor(p*SCENES.length),SCENES.length-1);
+      updateUI(idx);
+    }
+  });
+  
+  SCENES.forEach(s=>{
+    timeline.call(()=>{
+      clearScene();
+      scene.background=new THREE.Color(C.bg);
+      if(builders[s.id]) builders[s.id]();
+    });
+    timeline.to({},{duration:s.dur});
+  });
+  
+  timeline.call(()=>{
+    stopMatrix();
+    document.getElementById('sceneCounter').classList.remove('active');
+    document.getElementById('progressBar').classList.remove('active');
+    hideAllOverlays();
+    document.getElementById('sceneText').innerHTML='';
+    document.getElementById('startScreen').classList.remove('hidden');
+  });
+}
+
+// ============ INIT ============
+window.addEventListener('load',()=>{
+  initThree();
+  clearScene();
+  if(builders[1]) builders[1]();
+  document.getElementById('playBtn').addEventListener('click',startTimeline);
+});
+
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+  const cv=document.getElementById('matrix-canvas');
+  if(cv){cv.width=innerWidth;cv.height=innerHeight;}
+});
+</script>
+</body>
+</html>
