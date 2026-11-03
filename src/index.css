@@ -1,1 +1,28 @@
 @import "tailwindcss";
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Global styles */
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #050a14;
+  font-family: 'Inter', 'Montserrat', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Selection color */
+::selection {
+  background: rgba(255, 106, 0, 0.3);
+  color: white;
+}
+
+/* Ensure canvas fills */
+canvas {
+  display: block;
+}
