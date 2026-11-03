@@ -1,0 +1,13 @@
+{
+  "name": "bank-heist-video-export",
+  "version": "1.0.0",
+  "description": "Экспорт анимации BANK HEIST в MP4 видео",
+  "scripts": {
+    "capture": "node capture.js",
+    "build": "node build-video.js",
+    "export": "node capture.js && node build-video.js"
+  },
+  "dependencies": {
+    "puppeteer": "^21.0.0"
+  }
+}
